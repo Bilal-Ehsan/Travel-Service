@@ -1,15 +1,18 @@
 package com.example.travel;
 
+import com.rabbitmq.client.*;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -25,6 +28,12 @@ public class TravelOrchestrator {
             .version(HttpClient.Version.HTTP_2)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
+
+    private final static String QUEUE_NAME = "proposals";
+    private final static String EXCHANGE_NAME = "travel_offers";
+    private final static String ROUTING_KEY = "travel";
+
+    JSONArray proposals = new JSONArray();
 
     @GetMapping("/id")
     public JSONObject getId() throws InterruptedException, ExecutionException, TimeoutException {
@@ -70,7 +79,7 @@ public class TravelOrchestrator {
         JSONObject jsonObject = (JSONObject) parser.parse(result);
 
         JSONArray days = (JSONArray) jsonObject.get("days");
-        JSONObject json = new JSONObject(); // Will contain the response payload
+        JSONObject json = new JSONObject(); // Will contain the payload
 
         for (Object day : days) {
             JSONObject data = (JSONObject) day;
@@ -94,6 +103,51 @@ public class TravelOrchestrator {
         }
 
         return json;
+    }
+
+    @PostMapping("/propose-trip")
+    public void proposeTrip(@RequestBody String payload) throws IOException, TimeoutException {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost("localhost");
+
+        try (Connection connection = factory.newConnection();
+             Channel channel = connection.createChannel()) {
+            channel.exchangeDeclare(EXCHANGE_NAME, "direct");
+            channel.queueDeclare(QUEUE_NAME, true, false, false, null);
+
+            channel.basicPublish(EXCHANGE_NAME, ROUTING_KEY,
+                    MessageProperties.PERSISTENT_TEXT_PLAIN,
+                    payload.getBytes(StandardCharsets.UTF_8));
+
+            System.out.println(" [x] Sent '" + payload + "'");
+        }
+    }
+
+    @GetMapping("/trip")
+    public JSONArray getTrips() throws IOException, TimeoutException {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost("localhost");
+
+        final Connection connection = factory.newConnection();
+        final Channel channel = connection.createChannel();
+
+        channel.exchangeDeclare(EXCHANGE_NAME, BuiltinExchangeType.DIRECT);
+        channel.queueDeclare(QUEUE_NAME, true, false, false, null); // Durable
+        channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, ROUTING_KEY);
+        System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+        // Tells RabbitMQ not to give more than one message to a worker at a time
+        channel.basicQos(1);
+
+        DeliverCallback deliverCallback = (consumerTag, delivery) -> {
+            String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
+            System.out.println(" [x] Received '" + message + "'");
+            proposals.add(message);
+            channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false); // Delete message after acknowledged
+        };
+
+        channel.basicConsume(QUEUE_NAME, false, deliverCallback, consumerTag -> { });
+        return proposals;
     }
 
 }
