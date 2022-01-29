@@ -105,7 +105,7 @@ public class TravelOrchestrator {
         return json;
     }
 
-    @PostMapping("/propose-trip")
+    @PostMapping("/trip")
     public void proposeTrip(@RequestBody String payload) throws IOException, TimeoutException {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
@@ -144,19 +144,6 @@ public class TravelOrchestrator {
         };
 
         channel.basicConsume(QUEUE_NAME, false, deliverCallback, consumerTag -> { });
-
-        // Delete previous proposals from temporary store (don't want to send old data)
-        new java.util.Timer().schedule(
-                new java.util.TimerTask() {
-
-                @Override
-                public void run() {
-                    proposals.clear();
-                }
-            },
-                3000
-        );
-
         return proposals;
     }
 
