@@ -136,9 +136,6 @@ public class TravelOrchestrator {
         channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, ROUTING_KEY);
         System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
 
-        // Tells RabbitMQ not to give more than one message to a worker at a time
-        channel.basicQos(1);
-
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
             String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
             System.out.println(" [x] Received '" + message + "'");
@@ -147,6 +144,19 @@ public class TravelOrchestrator {
         };
 
         channel.basicConsume(QUEUE_NAME, false, deliverCallback, consumerTag -> { });
+
+        // Delete previous proposals from temporary store (don't want to send old data)
+        new java.util.Timer().schedule(
+                new java.util.TimerTask() {
+
+                @Override
+                public void run() {
+                    proposals.clear();
+                }
+            },
+                3000
+        );
+
         return proposals;
     }
 
