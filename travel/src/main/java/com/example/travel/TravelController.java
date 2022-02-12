@@ -29,13 +29,13 @@ public class TravelController {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    private final static String TRAVEL_QUEUE = "proposals";
-    private final static String TRAVEL_EXCHANGE = "travel_offers";
-    private final static String TRAVEL_ROUTING_KEY = "travel";
+    private static final String TRAVEL_QUEUE = "proposals";
+    private static final String TRAVEL_EXCHANGE = "travel_offers";
+    private static final String TRAVEL_ROUTING_KEY = "travel";
 
-    private final static String INTENT_QUEUE = "interests";
-    private final static String INTENT_EXCHANGE = "travel_intent";
-    private final static String INTENT_ROUTING_KEY = "intent";
+    private static final String INTENT_QUEUE = "interests";
+    private static final String INTENT_EXCHANGE = "travel_intent";
+    private static final String INTENT_ROUTING_KEY = "intent";
 
     JSONArray proposals = new JSONArray();
     JSONArray interests = new JSONArray();
